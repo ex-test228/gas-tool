@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <base target="_top">
+  <?!= HtmlService.createHtmlOutputFromFile('css').getContent(); ?>
+</head>
+
+<body class="body">
+  <h1 class="title">
+    レコード入力アプリ
+  </h1>
+
+  <h2 class="subtitle">
+    使い方
+  </h2>
+
+  <section>
+
+    <nav class="nav">
+      <div>
+        ・日付の「日」を変更するとシフトから出勤者の一覧表が作成されます。<br>
+        ・「出欠」の欄にチェックの入っている人のデータだけが対象になります。<br>データが入力されて欲しくない人のチェックは外してください。<br>
+        ・急なシフトの変更などで名前がない場合は下段にある入力欄で追加してください。<br>
+        ・「役割」はシフトからあらかじめ入力されていますが、<br>変更などがあった場合は都度変えてください。<br>
+        ・「送信」ボタンを押すとスプレッドシートに入力内容が反映されます。<br>
+        ・対象の日付にすでにデータが入力されている場合、警告文が出ます。<br>一度スプレッドシートを確認してみてください。
+      </div>
+    </nav>
+  </section>
+
+  <h2 class="subtitle">
+    レコード
+  </h2>
+  <section class="date" id="tableLoad">
+
+
+    <form>
+      <table>
+        <tr>
+          <td>年</td>
+          <td><input type="number" value="<?=year ?>" min="2000" max="2050" id="year" class="datebox"></td>
+        </tr>
+        <tr>
+          <td>月</td>
+          <td><input type="number" value="<?=month ?>" min="1" max="12" id="month" class="datebox"></td>
+        </tr>
+        <tr>
+          <td>日</td>
+          <td><input type="number" value="<?=day ?>" min="1" max="31"  id="date" onchange="tableLoading()" class="datebox">
+          </td>
+        </tr>
+      </table>
+    </form>
+    <p class="loaderText">表を<br>作成中・・・</p>
+    <div class="tableLoader"></div>
+  </section>
+
+  <!-- <button onclick="google.script.run.withSuccessHandler(createTable).getName(createDayObj())">test</button> -->
+
+  <div class="sheetnull">確認 : 該当の日付にはすでにデータが入力されています</div>
+
+  <section>
+    <table id="myTable" class="table" border="1">
+      <thead>
+        <tr>
+          <th>出欠</th>
+          <th>No.</th>
+          <th>名前</th>
+          <th>レコード</th>
+          <th>役割</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody" class="tbody">
+      </tbody>
+      <tfoot class="result">
+        <tr>
+          <td colspan="3">合計</td>
+          <td><output id="result"></output></td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <input type="text" id="newName" class="datebox"  placeholder="追加したい名前を入力">
+    <button onclick="plassRows()" class="plassButton">行を追加</button>
+    <div class="samename">すでに同じ名前の人がいます！</div>
+
+
+  </section>
+
+  <p id="nullcheck" class="nullrecord">値の入力されていない箇所があります！</p>
+  <p id="load" class="end">送信完了！！</p>
+  <p id="load" class="loaderTextSubmit">送信中・・・</p>
+  <div class="loader"></div>
+
+  <button onclick="loading(true)" class="button">送信</button>
+
+  <section>
+    <h2 class="subtitle">
+      <a href="https://docs.google.com/spreadsheets/d/1rVyq4aDUOHNhGrW5XuPpvEGPS_D6qfWiSzMuJ-KluWo/edit?gid=1710934021#gid=1710934021"
+        target="_blank" rel="noopener noreferrer">
+        レコード管理表
+    </h2>
+  </section>
+
+
+
+
+  <script>
+    // 日付のデータを配列で保存する関数
+    function createDayObj(dayObj){
+      return dayObj = {
+    year:document.getElementById('year').value,
+    month:document.getElementById('month').value,
+    day:document.getElementById('date').value
+  }
+    }
+
+
+    // 合計を算出する関数
+    function sum(){
+    let sumValue = 0;
+  const elements = document.querySelectorAll('input[id^="value"]'); // IDが"value"で始まる要素を取得
+
+  elements.forEach(element => {
+    const value = parseInt(element.value);
+    if (!isNaN(value)) {
+      sumValue += value;
+    }
+  });
+
+  document.getElementById('result').value = sumValue;
+}
+ 
+
+// 送信するデータを配列に保存する関数
+function createData(){
+  let dataAry =[]
+
+  dataAry.push(createDayObj())
+
+const checkElements = document.querySelectorAll('input[id^="attendance"]')
+const nameElements = document.querySelectorAll('p[id^="name"]')
+const valueElements = document.querySelectorAll('input[id^="value"]')
+const positionElements = document.querySelectorAll('select[id^="position"]')
+
+  let dataObj = {
+    name:'',
+    record:0,
+    position:'',
+  }
+
+  for (let i = 0; i < nameElements.length;i++){
+    if(checkElements[i].checked){
+    dataObj.name = nameElements[i].textContent
+    dataObj.record = valueElements[i].value
+    dataObj.position = positionElements[i].value
+    dataAry.push({...dataObj})
+    }
+  }
+ return dataAry
+}
+
+// 表の1行分の要素を作成する関数
+function createRows(idNum,name) {
+    return `
+      <td><input type="checkbox" id="attendance${idNum + 1}" class="box" checked></td>
+      <td><p class="box">${idNum + 1}</p></td>
+      <td><p id="name${idNum + 1}" class="namebox">${name}</p></td>
+      <td><input type="number" value="0" min="0" id="value${idNum + 1}" oninput="sum(this.value)" class="box"></td>
+      <td><select id="position${idNum + 1}">
+        <option value="N"></option>
+        <option value="P">position1</option>
+        <option value="D">position2</option>
+        <option value="Z">position3</option>
+        <option value="O">その他</option>
+      </select></td>
+    `;
+}
+
+// 1つの表を作成する関数
+function createTable(ary){
+   let tableBody = document.getElementById("tableBody");
+  // <tbody>要素をクリアする
+  tableBody.innerHTML = '';
+
+  for (let i = 0; i < ary[0].length; i++) {
+    const newRow = document.createElement("tr");
+    newRow.innerHTML = createRows(i, ary[0][i]);
+    tableBody.appendChild(newRow);
+    if(ary[0][i] == ary[3].name){
+      document.getElementById(`position${i + 1}`).options[2].selected = true; 
+    }
+  }
+    for (let i = 0; i < ary[1].length; i++) {
+    const newRow = document.createElement("tr");
+    newRow.innerHTML = createRows(i + ary[0].length, ary[1][i]);
+    tableBody.appendChild(newRow);
+    document.getElementById(`position${i + ary[0].length + 1}`).options[1].selected = true; 
+  }
+
+    for (let i = 0; i < ary[2].length; i++) {
+    const newRow = document.createElement("tr");
+    newRow.innerHTML = createRows(i + ary[0].length + ary[1].length, ary[2][i]);
+    tableBody.appendChild(newRow);
+    document.getElementById(`position${i + ary[0].length + ary[1].length + 1}`).options[1].selected = true; 
+
+    
+  }
+  document.querySelector(".tableLoader").style.display = "none";
+  document.querySelector(".loaderText").style.display = "none";
+}
+
+// 表に1行を追加する関数
+function plassRows(){
+  const nameElements = document.querySelectorAll('p[id^="name"]')
+  const newName = document.getElementById("newName").value;
+  let checkNewName = true;
+  for(let i=0;i < nameElements.length;i++){
+    if(nameElements[i].textContent == newName){
+      checkNewName = false;
+      document.querySelector(".samename").style.display = "block";
+    }else{
+    }
+  }
+
+if(checkNewName === true){
+  const tableBody = document.getElementById("tableBody");
+  const newRow = document.createElement("tr");
+  newRow.innerHTML = createRows(nameElements.length,newName)
+  tableBody.appendChild(newRow);
+}
+}
+
+// 入力されていない箇所がないか調べる関数
+function recordCheck(){
+  document.querySelector(".nullrecord").style.display = "none";
+  const recordElements = document.querySelectorAll('input[id^="value"]')
+  const checkElements = document.querySelectorAll('input[id^="attendance"]')
+  let checkRecordNull = true;
+  for(let i=0;i < recordElements.length;i++){
+    if(recordElements[i].value == ''){
+      if(checkElements[i].checked){
+      checkRecordNull = false;
+      document.querySelector(".nullrecord").style.display = "block";
+    }else{
+    }
+    }else{
+
+    }
+  }
+  if(checkRecordNull === true){
+ return true
+}
+}
+
+// ローディングアニメーションを終了する関数
+function loadingEnd(){
+  document.querySelector(".loader").style.display = "none";
+  document.querySelector(".end").style.display = "block";
+  document.querySelector(".loaderTextSubmit").style.display = "none"
+}
+
+// ローディングアニメーションを開始し、データを送信する関数
+function loading(sendSheet){
+  let recordTF = recordCheck()
+  if(recordTF === true){
+ document.querySelector(".loader").style.display = "block";
+ document.querySelector(".end").style.display = "none";
+ document.querySelector(".loaderTextSubmit").style.display = "block"
+ google.script.run.withSuccessHandler(loadingEnd).past(createData(),sendSheet)
+  }else{
+    
+  }
+}
+
+// スプレッドシートの該当の日付にデータが既に入力されているか調べる関数
+function nullText(nullCount){
+  document.querySelector(".sheetnull").style.display = "none";
+    if(nullCount === true){
+  }else{
+    document.querySelector(".sheetnull").style.display = "block";
+  }
+}
+
+// 表を作成する関数
+function tableLoading(){
+  google.script.run.withSuccessHandler(nullText).nullCheck(createDayObj())   
+  document.querySelector(".tableLoader").style.display = "block";
+  document.querySelector(".loaderText").style.display = "block";
+  google.script.run.withSuccessHandler(createTable).getName(createDayObj())
+
+}
+
+
+
+window.onload = tableLoading()
+
+  </script>
+</body>
+
+</html>
